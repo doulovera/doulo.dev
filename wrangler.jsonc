@@ -1,15 +1,22 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "doulo-dev",
+  "main": "src/index.ts",
   "compatibility_date": "2026-07-23",
   "workers_dev": false,
   "preview_urls": false,
   "assets": {
-  "directory": "./public"
-    // When you're ready for Worker logic, add:
-    //   "main": "src/index.ts"   (top-level, next to "assets")
-    //   "binding": "ASSETS"      (here, to fetch assets from the Worker)
+    // Files in ./public are served first; unmatched paths fall through to the Worker.
+    "directory": "./public"
   },
+  "kv_namespaces": [
+    {
+      // Short links: key = slug, value = destination URL.
+      // No "id" yet: recent wrangler versions provision the namespace on deploy.
+      // Alternatively run `wrangler kv namespace create LINKS` and paste the "id" here.
+      "binding": "LINKS"
+    }
+  ],
   "observability": {
     "enabled": true
   }
