@@ -2,7 +2,7 @@
 
 The source for [doulo.dev](https://doulo.dev), Douglas Lovera's personal link page.
 
-The site keeps things small and direct: a dark, responsive grid with links to Douglas's website, code, and social profiles. It uses plain HTML and CSS, with inline SVG icons and a dithered color wash on tile hover. There is no JavaScript or frontend framework.
+The site keeps things small and direct: a dark, responsive grid with links to Douglas's website, code, and social profiles. It uses plain HTML, CSS, and a small script that draws ordered-dither effects on canvas: a pointer-lit sphere, a dissolving title, and a color wash on tile hover. There is no frontend framework, and the page still works without JavaScript.
 
 ## Preview
 
@@ -20,6 +20,7 @@ The site keeps things small and direct: a dark, responsive grid with links to Do
 ## Stack
 
 - HTML and CSS
+- Vanilla JavaScript and canvas
 - Inline SVG icons
 - [Cloudflare Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/)
 - [Wrangler](https://developers.cloudflare.com/workers/wrangler/)
@@ -29,7 +30,8 @@ The site keeps things small and direct: a dark, responsive grid with links to Do
 ```text
 public/
 ├── index.html    # Page markup and links
-└── styles.css    # Layout, theme, responsive rules, and hover effects
+├── styles.css    # Layout, theme, and responsive rules
+└── app.js        # Ordered-dither canvas effects
 wrangler.jsonc    # Cloudflare deployment configuration
 ```
 

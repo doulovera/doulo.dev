@@ -1,11 +1,13 @@
 :root {
-  --bg: #0a0a0b;
-  --tile: #141416;
-  --tile-hover: #1a1a1d;
-  --border: #262629;
-  --text: #f5f5f5;
-  --muted: #8a8a90;
-  --faint: #56565c;
+  color-scheme: dark;
+  --bg: #08080a;
+  --tile: #0e0e11;
+  --plate: #08080a;
+  --line: #27272c;
+  --text: #f2f2ee;
+  --muted: #94949c;
+  --display: "Archivo", "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
 * {
@@ -16,36 +18,54 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--bg);
 }
 
 body {
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
-  background: var(--bg);
+  font-family: var(--display);
   color: var(--text);
   min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
+  padding: 40px 32px;
   -webkit-font-smoothing: antialiased;
+}
+
+canvas {
+  image-rendering: pixelated;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .page {
   width: 100%;
-  max-width: 940px;
+  max-width: 1120px;
 }
 
 /* ---------- Hero ---------- */
 .hero {
-  text-align: center;
-  margin-bottom: 40px;
+  position: relative;
+  padding: 28px 0 44px;
 }
 
 .hero__title {
-  font-size: clamp(2.75rem, 8vw, 5rem);
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  font-size: min(13.6vw, 7.75rem);
   font-weight: 900;
-  line-height: 0.9;
-  letter-spacing: -0.03em;
+  font-stretch: 125%;
+  line-height: 0.86;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
 }
 
@@ -54,29 +74,50 @@ body {
 }
 
 .hero__subtitle {
-  margin-top: 14px;
-  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  position: relative;
+  z-index: 1;
+  margin-top: 22px;
+  font-family: var(--mono);
+  font-size: clamp(0.875rem, 1.6vw, 1rem);
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   color: var(--muted);
+}
+
+.hero__subtitle::before {
+  content: "> ";
+  color: var(--text);
+}
+
+.hero__orb {
+  position: absolute;
+  top: 50%;
+  right: -32px;
+  width: 385px;
+  aspect-ratio: 1;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 /* ---------- Grid ---------- */
 .grid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 16px;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
 }
 
 /* Row 1: two large tiles (span 3) — Row 2: three small tiles (span 2) */
 .tile--lg {
   grid-column: span 3;
-  aspect-ratio: 3 / 2;
+  min-height: 206px;
 }
 
 .tile--sm {
   grid-column: span 2;
-  aspect-ratio: 1 / 1;
+  min-height: 182px;
 }
 
 /* ---------- Tile ---------- */
@@ -85,146 +126,183 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 20px;
-  border-radius: 16px;
+  padding: 18px;
   background: var(--tile);
-  border: 1px solid var(--border);
   text-decoration: none;
   color: var(--text);
   isolation: isolate;
-  transition: border-color 0.3s ease, background-color 0.3s ease, transform 0.3s ease;
+  outline: none;
 }
 
-.tile:hover {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  background: var(--tile-hover);
-  transform: translateY(-2px);
+.tile:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
 }
 
-/* ---------- Dithered hover wash ---------- */
 .tile__dither {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background-color: var(--accent);
-  opacity: 0;
-  transition: opacity 0.35s ease;
-  /* Ordered-dither checkerboard: 3px pixels reading as a 50% dither texture,
-     faded from the bottom edge upward so the wash dissolves into the tile. */
-  -webkit-mask-image:
-    repeating-conic-gradient(#000 0% 25%, transparent 0% 50%),
-    linear-gradient(to top, #000 0%, transparent 92%);
-  mask-image:
-    repeating-conic-gradient(#000 0% 25%, transparent 0% 50%),
-    linear-gradient(to top, #000 0%, transparent 92%);
-  -webkit-mask-size: 6px 6px, 100% 100%;
-  mask-size: 6px 6px, 100% 100%;
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
+  width: 100%;
+  height: 100%;
 }
 
-.tile:hover .tile__dither {
-  opacity: 0.5;
-}
-
-/* ---------- Tile bits ---------- */
-.tile__label {
-  align-self: flex-start;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 5px 11px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
+.tile__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: auto;
+  padding-bottom: 28px;
 }
 
 .tile__logo {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text);
-  transition: transform 0.3s ease, color 0.3s ease;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  transition: border-color 0.2s ease;
 }
 
 .tile__logo svg {
-  width: 46px;
-  height: 46px;
+  display: block;
+  width: 28px;
+  height: 28px;
 }
 
-.tile--lg .tile__logo svg {
-  width: 58px;
-  height: 58px;
+.tile__arrow {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+  background: var(--plate);
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
-.tile:hover .tile__logo {
-  transform: scale(1.06);
+.tile__arrow svg {
+  width: 14px;
+  height: 14px;
 }
 
-.tile__name {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+.tile:hover .tile__logo,
+.tile:focus-visible .tile__logo {
+  border-color: var(--accent);
+}
+
+.tile:hover .tile__arrow,
+.tile:focus-visible .tile__arrow {
   color: var(--text);
+  transform: translate(2px, -2px);
+}
+
+/* Text sits on solid plates so it stays readable over any dither density. */
+.tile__name {
+  align-self: flex-start;
+  max-width: 100%;
+  background: var(--plate);
+  padding: 4px 7px 5px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
   overflow-wrap: anywhere;
 }
 
-.tile--lg .tile__name {
-  font-size: 17px;
-}
-
-/* ---------- Empty / coming-soon tiles ---------- */
-.tile--empty {
-  cursor: default;
-  border-style: dashed;
-}
-
-.tile--empty .tile__label {
-  color: var(--faint);
-}
-
-.tile--empty:hover {
-  transform: none;
-  border-color: var(--border);
-  background: var(--tile);
-}
-
-.tile--empty:hover .tile__dither {
-  opacity: 0.16;
+.tile--sm .tile__name {
+  font-size: 16px;
 }
 
 /* ---------- Responsive ---------- */
-@media (max-width: 640px) {
+/* Below this width the name fills the row, so the sphere moves above it. */
+@media (max-width: 1240px) {
+  .hero {
+    --orb: clamp(240px, 36vw, 340px);
+    padding-top: calc(var(--orb) * 0.72);
+  }
+
+  .hero__orb {
+    top: calc(var(--orb) * -0.17);
+    width: var(--orb);
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
   body {
-    padding: 32px 18px;
     align-items: flex-start;
+    padding: 24px 18px;
+  }
+
+  .hero {
+    padding-bottom: 36px;
+  }
+
+  .hero__orb {
+    right: -18px;
   }
 
   .grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    grid-template-columns: 1fr;
   }
 
   .tile--lg,
   .tile--sm {
-    grid-column: span 1;
-    aspect-ratio: 1 / 1;
+    grid-column: auto;
+    min-height: 0;
   }
 
-  /* First tile spans the full width so the remaining four pair up evenly */
-  .grid > .tile:first-child {
-    grid-column: span 2;
-    aspect-ratio: 3 / 2;
+  .tile {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    column-gap: 14px;
+    padding: 14px;
+  }
+
+  .tile__top {
+    display: contents;
+  }
+
+  .tile__logo {
+    grid-column: 1;
+    width: 52px;
+    height: 52px;
+  }
+
+  .tile__logo svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .tile__arrow {
+    grid-column: 3;
+  }
+
+  .tile__name,
+  .tile--sm .tile__name {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    justify-self: start;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .tile__arrow {
+    display: none;
+  }
+
+  .tile__name,
+  .tile--sm .tile__name {
+    font-size: 13px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile,
-  .tile__dither,
-  .tile__logo {
+  .tile__logo,
+  .tile__arrow {
     transition: none;
   }
 }
