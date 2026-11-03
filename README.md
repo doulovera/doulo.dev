@@ -13,7 +13,7 @@ The site keeps things small and direct: a dark, responsive grid with links to Do
 ## Links
 
 - [Website](https://doulovera.com)
-- [GitHub](https://github.com/douglaslovera)
+- [GitHub](https://github.com/doulovera)
 - [LinkedIn](https://www.linkedin.com/in/douglaslovera)
 - [Instagram](https://www.instagram.com/doulovera)
 
