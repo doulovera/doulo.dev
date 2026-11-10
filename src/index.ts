@@ -88,29 +88,32 @@ async function linksPage(env: Env): Promise<Response> {
       color: #f2f2ee;
       -webkit-font-smoothing: antialiased;
     }
-    main { width: 100%; }
+    /* main is sized by the title alone (the list has contain: inline-size),
+       and nudged left so the title + hanging list sit balanced. */
+    main { transform: translateX(-48px); }
     h1 {
       font-family: "Archivo", system-ui, sans-serif;
       font-weight: 800;
       font-size: 70px;
       line-height: 1;
       letter-spacing: -0.03em;
-      text-align: center;
     }
-    /* The list starts at a fixed offset from the centre, so longer slugs
-       grow to the right without shifting the icon column. */
+    /* The icon column starts just before the end of the title; longer slugs
+       extend to the right without moving anything. */
     ul {
+      contain: inline-size;
       list-style: none;
       display: grid;
       gap: 10px;
-      margin-top: 56px;
-      padding-left: calc(50% - 50px);
+      margin-top: 32px;
+      padding-left: calc(100% - 24px);
       font: 500 14px/1.4 "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
     }
     a {
       display: flex;
       align-items: center;
       gap: 12px;
+      width: max-content;
       color: inherit;
       text-decoration: none;
     }
@@ -118,7 +121,14 @@ async function linksPage(env: Env): Promise<Response> {
       text-decoration: underline;
       text-underline-offset: 3px;
     }
-    span { min-width: 0; overflow-wrap: anywhere; }
+    span { white-space: nowrap; }
+    @media (max-width: 600px) {
+      main { transform: none; }
+      h1 { font-size: 56px; }
+      ul { padding-left: 45%; }
+      a { width: auto; }
+      span { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+    }
     svg { width: 16px; height: 16px; flex: none; color: #94949c; }
   </style>
 </head>
