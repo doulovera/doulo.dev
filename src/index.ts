@@ -60,7 +60,7 @@ async function linksPage(env: Env): Promise<Response> {
   const items = names
     .map(
       (name) =>
-        `<li><a href="/${escapeHtml(encodeURIComponent(name))}">${Object.hasOwn(ICONS, name) ? ICONS[name] : FALLBACK_ICON}<span>/${escapeHtml(name)}</span></a></li>`,
+        `<li><a href="/${escapeHtml(encodeURIComponent(name))}">${Object.hasOwn(ICONS, name) ? ICONS[name] : FALLBACK_ICON}<span>${escapeHtml(name)}</span></a></li>`,
     )
     .join("\n      ");
 
@@ -88,9 +88,13 @@ async function linksPage(env: Env): Promise<Response> {
       color: #f2f2ee;
       -webkit-font-smoothing: antialiased;
     }
-    /* main is sized by the title alone (the list has contain: inline-size),
-       and nudged left so the title + hanging list sit balanced. */
-    main { transform: translateX(-48px); }
+    /* Title and list sit side by side, vertically centered on each other,
+       so the links spread above and below the title's midline. */
+    main {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
     h1 {
       font-family: "Archivo", system-ui, sans-serif;
       font-weight: 800;
@@ -98,15 +102,10 @@ async function linksPage(env: Env): Promise<Response> {
       line-height: 1;
       letter-spacing: -0.03em;
     }
-    /* The icon column starts just before the end of the title; longer slugs
-       extend to the right without moving anything. */
     ul {
-      contain: inline-size;
       list-style: none;
       display: grid;
       gap: 10px;
-      margin-top: 32px;
-      padding-left: calc(100% - 24px);
       font: 500 14px/1.4 "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
     }
     a {
@@ -123,18 +122,23 @@ async function linksPage(env: Env): Promise<Response> {
     }
     span { white-space: nowrap; }
     @media (max-width: 600px) {
-      main { transform: none; }
+      /* Stack the links under the title: the link text starts beneath the
+         trailing slash and the icon hangs just left of it. main is sized by
+         the title alone (the list has contain: inline-size). */
+      main { display: block; }
       h1 { font-size: 56px; }
-      ul { padding-left: 45%; }
-      a { width: auto; }
-      span { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+      ul {
+        contain: inline-size;
+        margin-top: 24px;
+        padding-left: calc(100% - 46px);
+      }
     }
     svg { width: 16px; height: 16px; flex: none; color: #94949c; }
   </style>
 </head>
 <body>
   <main>
-    <h1>doulo.dev</h1>
+    <h1>doulo.dev/</h1>
     <ul>
       ${items}
     </ul>
