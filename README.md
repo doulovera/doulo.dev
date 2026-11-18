@@ -29,7 +29,7 @@ The site keeps things small and direct: a dark, responsive grid with links to Do
 
 ```text
 public/
-├── index.html    # Page markup and links
+├── l.html        # Portfolio page (served at /l)
 ├── styles.css    # Layout, theme, and responsive rules
 └── app.js        # Ordered-dither canvas effects
 wrangler.jsonc    # Cloudflare deployment configuration
