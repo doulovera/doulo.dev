@@ -68,7 +68,7 @@ async function linksPage(env: Env): Promise<Response> {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Links — Douglas Lovera</title>
   <meta name="theme-color" content="#08080a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -134,15 +134,31 @@ async function linksPage(env: Env): Promise<Response> {
       }
     }
     svg { width: 16px; height: 16px; flex: none; color: #94949c; }
+    .landscape {
+      /* Absolute, not fixed: iOS Safari clips fixed elements above its
+         floating toolbar, but draws in-flow page content underneath it.
+         Large viewport height so it reaches the bottom edge of the screen. */
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: -1;
+      width: 100%;
+      height: 100vh;
+      height: 100lvh;
+      pointer-events: none;
+      image-rendering: pixelated;
+    }
   </style>
 </head>
 <body>
+  <canvas class="landscape" aria-hidden="true"></canvas>
   <main>
     <h1>doulo.dev/</h1>
     <ul>
       ${items}
     </ul>
   </main>
+  <script>${LANDSCAPE_SCRIPT}</script>
 </body>
 </html>`;
 
@@ -150,6 +166,131 @@ async function linksPage(env: Env): Promise<Response> {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" },
   });
 }
+
+// Static, ordered-dither (Bayer 8x8) landscape for the /l backdrop: a hazy sky
+// over layered ridges that darken as they come forward.
+const LANDSCAPE_SCRIPT = `(() => {
+  const canvas = document.querySelector(".landscape");
+  if (!canvas) return;
+  const CELL = 3;
+  const PALETTE = [[8, 8, 10], [22, 22, 26], [38, 38, 44], [60, 60, 68], [92, 92, 100]];
+  const COLORS = PALETTE.map(([r, g, b]) => ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0);
+  const LEVELS = COLORS.length - 1;
+
+  let bayer = [0];
+  for (let n = 1; n < 8; n *= 2) {
+    const next = new Array(n * n * 4);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const v = bayer[y * n + x] * 4;
+      next[y * 2 * n + x] = v;
+      next[y * 2 * n + x + n] = v + 2;
+      next[(y + n) * 2 * n + x] = v + 3;
+      next[(y + n) * 2 * n + x + n] = v + 1;
+    }
+    bayer = next;
+  }
+  bayer = bayer.map((v) => (v + 0.5) / 64);
+
+  // Deterministic 1D fractal value noise, so the skyline is the same on every visit.
+  const lattice = [];
+  let seed = 11;
+  for (let i = 0; i < 512; i++) {
+    seed = (seed * 16807) % 2147483647;
+    lattice.push(seed / 2147483647);
+  }
+  const noise = (t) => {
+    const i = Math.floor(t);
+    const f = t - i;
+    const s = f * f * (3 - 2 * f);
+    const a = lattice[((i % 512) + 512) % 512];
+    const b = lattice[(((i + 1) % 512) + 512) % 512];
+    return a + (b - a) * s;
+  };
+  const fbm = (t) => {
+    let sum = 0, amp = 0.5, freq = 1;
+    for (let o = 0; o < 5; o++) {
+      // Folded noise gives sharper, ridge-like peaks.
+      sum += (1 - Math.abs(noise(t * freq) * 2 - 1)) * amp;
+      amp *= 0.5;
+      freq *= 2.1;
+    }
+    return sum;
+  };
+
+  // Far to near: horizon line, peak height, horizontal scale, tone, offset.
+  const RIDGES = [
+    { base: 0.6, height: 0.24, scale: 2.4, tone: 0.34, offset: 0 },
+    { base: 0.7, height: 0.2, scale: 3.2, tone: 0.24, offset: 40 },
+    { base: 0.82, height: 0.16, scale: 4.2, tone: 0.15, offset: 90 },
+    { base: 0.94, height: 0.12, scale: 5.5, tone: 0.06, offset: 150 },
+  ];
+
+  const draw = () => {
+    const cssWidth = canvas.clientWidth || innerWidth;
+    const cssHeight = canvas.clientHeight || innerHeight;
+    const width = Math.max(1, Math.ceil(cssWidth / CELL));
+    const height = Math.max(1, Math.ceil(cssHeight / CELL));
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    const image = ctx.createImageData(width, height);
+    const pixels = new Uint32Array(image.data.buffer);
+    const aspect = width / height;
+
+    // Squeeze the ridges into the band below the title and links, so no peak
+    // rises over the text. PEAK is the highest point of the far ridge.
+    const PEAK = 0.36;
+    const main = document.querySelector("main");
+    const floor = main ? (main.getBoundingClientRect().bottom - canvas.getBoundingClientRect().top + 32) / cssHeight : PEAK;
+    const top = Math.min(0.85, Math.max(PEAK, floor));
+    const fit = (line) => top + ((line - PEAK) * (1 - top)) / (1 - PEAK);
+
+    const lines = RIDGES.map((r) => {
+      const line = new Float32Array(width);
+      for (let x = 0; x < width; x++) {
+        const u = (x / width) * Math.min(aspect, 2.2);
+        line[x] = fit(r.base - fbm(u * r.scale + r.offset) * r.height);
+      }
+      return line;
+    });
+
+    for (let y = 0; y < height; y++) {
+      const v = y / height;
+      for (let x = 0; x < width; x++) {
+        let value = -1;
+        for (let i = RIDGES.length - 1; i >= 0; i--) {
+          const crest = lines[i][x];
+          if (v >= crest) {
+            // A faint rim on the crest, then mist pooling towards the foot, so each
+            // nearer (darker) ridge stands out against the haze behind it.
+            const depth = Math.min(1, (v - crest) / ((0.22 * (1 - top)) / (1 - PEAK)));
+            const rim = Math.max(0, 1 - depth * 12) * 0.08;
+            value = RIDGES[i].tone + depth * depth * 0.2 + rim;
+            break;
+          }
+        }
+        if (value < 0) {
+          // Sky: faint haze over the horizon.
+          const haze = Math.max(0, (v - (top - 0.25)) / 0.4);
+          value = haze * haze * 0.3;
+        }
+        const scaled = Math.min(1, Math.max(0, value)) * LEVELS;
+        const level = Math.floor(scaled);
+        const step = scaled - level > bayer[(y % 8) * 8 + (x % 8)] ? 1 : 0;
+        pixels[y * width + x] = COLORS[Math.min(LEVELS, level + step)];
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+  };
+
+  draw();
+  document.fonts?.ready.then(draw);
+  let timer;
+  addEventListener("resize", () => {
+    clearTimeout(timer);
+    timer = setTimeout(draw, 120);
+  });
+})();`;
 
 // Icons keyed by slug (GitHub, LinkedIn, Substack marks from public/index.html; Instagram, X from Simple Icons).
 const ICONS: Record<string, string> = {
