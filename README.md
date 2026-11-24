@@ -1,38 +1,27 @@
 # doulo.dev
 
-The source for [doulo.dev](https://doulo.dev), Douglas Lovera's personal link page.
+The source for [doulo.dev](https://doulo.dev), Douglas Lovera's minimalist portfolio and link shortener on Cloudflare Workers.
 
-The site keeps things small and direct: a dark, responsive grid with links to Douglas's website, code, and social profiles. It uses plain HTML, CSS, and a small script that draws ordered-dither effects on canvas: a pointer-lit sphere, a dissolving title, and a color wash on tile hover. There is no frontend framework, and the page still works without JavaScript.
+## Overview
 
-## Preview
-
-[![doulo.dev homepage](docs/doulo-dev.png)](https://doulo.dev)
-
-[Open doulo.dev](https://doulo.dev)
-
-## Links
-
-- [Website](https://doulovera.com)
-- [GitHub](https://github.com/doulovera)
-- [LinkedIn](https://www.linkedin.com/in/douglaslovera)
-- [Instagram](https://www.instagram.com/doulovera)
-
-## Stack
-
-- HTML and CSS
-- Vanilla JavaScript and canvas
-- Inline SVG icons
-- [Cloudflare Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/)
-- [Wrangler](https://developers.cloudflare.com/workers/wrangler/)
+- Minimalist dark landing page centered on Douglas Lovera — **Software Developer & Engineering**
+- Dynamic macOS-style frosted glass dock populated directly from the Cloudflare KV `LINKS` namespace
+- Smooth pointer-driven dock magnification physics, floating tooltips, keyboard navigation, and reduced-motion support
+- Short-link redirects at `/<slug>` resolved via Cloudflare KV
 
 ## Project structure
 
 ```text
+src/
+├── index.ts      # Cloudflare Worker router (/, /<slug>, 404)
+├── links.ts      # KV namespace reader, redirect lookup, and icon presets
+└── page.ts       # Server-rendered HTML templates
 public/
-├── l.html        # Portfolio page (served at /l)
-├── styles.css    # Layout, theme, and responsive rules
-└── app.js        # Ordered-dither canvas effects
-wrangler.jsonc    # Cloudflare deployment configuration
+├── favicon.svg
+└── assets/
+    ├── main.css  # Dark Apple-inspired styling and dock surfaces
+    └── dock.js   # macOS dock magnification physics
+wrangler.jsonc    # Cloudflare Workers & KV configuration
 ```
 
 ## Run locally
@@ -44,14 +33,8 @@ pnpm install
 pnpm dev
 ```
 
-Wrangler will start a local server and serve the files in `public/`.
-
 ## Deploy
-
-Log in to Cloudflare, then run:
 
 ```bash
 pnpm deploy
 ```
-
-The deployment uses `public/` as the static asset directory. Project settings such as the production domain are managed through the Cloudflare project configuration.

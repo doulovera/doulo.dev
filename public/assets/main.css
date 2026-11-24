@@ -1,0 +1,454 @@
+:root {
+  color-scheme: dark;
+  --canvas: #000000;
+  --ink-primary: #f5f5f7;
+  --ink-secondary: rgba(245, 245, 247, 0.58);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
+  --ease-apple: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --dock-base: 52px;
+  --dock-gap: 11px;
+  --dock-pad-y: 10px;
+  --dock-shelf-height: calc(var(--dock-base) + var(--dock-pad-y) * 2);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background: var(--canvas);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--canvas);
+  color: var(--ink-primary);
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+::selection {
+  background: rgba(10, 132, 255, 0.36);
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+}
+
+/* ---------- Centered Stage & Subtle Studio Lighting ---------- */
+.stage {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(32px, 6vh, 64px) 24px;
+}
+
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 70% 48% at 50% 18%,
+      rgba(255, 255, 255, 0.065) 0%,
+      rgba(164, 178, 206, 0.025) 42%,
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 42% 24% at 50% 62%,
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 72%
+    );
+}
+
+/* ---------- Centered Hero ---------- */
+.hero {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.hero-name {
+  font-size: clamp(0.9375rem, 1.35vw, 1.125rem);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.012em;
+  color: var(--ink-secondary);
+  margin-bottom: clamp(10px, 1.5vh, 14px);
+  animation: reveal 0.8s var(--ease-apple) both;
+}
+
+.hero-role {
+  font-size: clamp(2rem, 4.4vw, 3.375rem);
+  font-weight: 600;
+  line-height: 1.14;
+  letter-spacing: -0.034em;
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
+  text-wrap: balance;
+  color: var(--ink-primary);
+  background: linear-gradient(180deg, #ffffff 20%, rgba(235, 235, 245, 0.72) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: reveal 0.9s var(--ease-apple) 0.08s both;
+}
+
+.back-pill {
+  margin-top: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink-primary);
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s var(--ease-apple);
+}
+
+.back-pill:hover,
+.back-pill:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.24);
+  outline: none;
+}
+
+.back-pill:active {
+  transform: scale(0.97);
+}
+
+/* ---------- macOS Dock (anchored close below the hero, fixed headroom so text never shifts) ---------- */
+.dock-region {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  margin-top: clamp(14px, 2.2vh, 22px);
+  height: calc(var(--dock-shelf-height) + 64px);
+  animation: dock-enter 0.95s var(--ease-apple) 0.16s both;
+}
+
+.dock {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  max-width: 100%;
+  padding: 0 12px;
+}
+
+/* Frosted macOS Vibrancy shelf */
+.dock-shelf {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--dock-shelf-height);
+  border-radius: 22px;
+  background: linear-gradient(
+    180deg,
+    rgba(56, 56, 62, 0.48) 0%,
+    rgba(24, 24, 28, 0.64) 100%
+  );
+  backdrop-filter: blur(34px) saturate(190%);
+  -webkit-backdrop-filter: blur(34px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.36),
+    0 22px 48px -10px rgba(0, 0, 0, 0.8),
+    0 4px 14px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.dock-list {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--dock-gap);
+  padding-bottom: var(--dock-pad-y);
+  list-style: none;
+}
+
+.dock-item {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  flex: 0 0 auto;
+}
+
+.dock-link {
+  --icon-size: var(--dock-base);
+  --icon-lift: 0px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  margin-bottom: var(--icon-lift);
+  text-decoration: none;
+  color: var(--ink-primary);
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  will-change: width, height, margin-bottom;
+}
+
+/* Fallback hover when JS is disabled */
+@media (hover: hover) and (pointer: fine) {
+  .dock:not([data-dock-ready]) .dock-link {
+    transition: transform 0.22s var(--ease-apple);
+    transform-origin: center bottom;
+  }
+
+  .dock:not([data-dock-ready]) .dock-link:hover {
+    transform: translateY(-4px) scale(1.25);
+  }
+}
+
+/* Authentic macOS app icon squircle */
+.dock-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 23%;
+  overflow: hidden;
+  background: var(--icon-bg, linear-gradient(180deg, #34363d 0%, #1c1d22 100%));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.28),
+    0 7px 16px rgba(0, 0, 0, 0.52),
+    0 1px 3px rgba(0, 0, 0, 0.38);
+  transition:
+    box-shadow 0.2s ease,
+    filter 0.2s ease,
+    transform 0.18s var(--ease-apple);
+}
+
+/* Subtle Apple specular sheen across upper half */
+.dock-icon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.03) 44%,
+    transparent 52%
+  );
+  pointer-events: none;
+}
+
+.dock-icon svg {
+  position: relative;
+  z-index: 1;
+  width: var(--icon-scale, 54%);
+  height: var(--icon-scale, 54%);
+  color: var(--icon-color, #ffffff);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.24));
+  transition: transform 0.2s var(--ease-apple);
+}
+
+.dock-link:hover .dock-icon,
+.dock-link:focus-visible .dock-icon {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.24),
+    0 12px 24px rgba(0, 0, 0, 0.62),
+    0 2px 6px rgba(0, 0, 0, 0.42);
+  filter: brightness(1.06);
+}
+
+.dock-link:focus-visible .dock-icon {
+  outline: 2px solid #0a84ff;
+  outline-offset: 3px;
+}
+
+.dock-link:active .dock-icon {
+  transform: scale(0.92);
+  filter: brightness(0.94);
+}
+
+.dock-item.is-bouncing .dock-icon {
+  animation: dock-bounce 0.46s var(--ease-apple);
+}
+
+/* macOS Dock Tooltip */
+.dock-tooltip {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  padding: 5px 11px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.006em;
+  white-space: nowrap;
+  color: var(--ink-primary);
+  background: rgba(40, 40, 45, 0.88);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(5px) scale(0.95);
+  transition:
+    opacity 0.15s ease,
+    transform 0.2s var(--ease-apple);
+}
+
+.dock-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: rgba(34, 34, 39, 0.92);
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  transform: translate(-50%, -4px) rotate(45deg);
+}
+
+.dock-link:hover .dock-tooltip,
+.dock-link:focus-visible .dock-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+/* macOS active running dot beneath icon */
+.dock-indicator {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(245, 245, 247, 0.88);
+  opacity: 0;
+  transform: translateX(-50%) scale(0.5);
+  transition: opacity 0.18s ease, transform 0.2s var(--ease-apple);
+  pointer-events: none;
+}
+
+.dock-link:hover .dock-indicator,
+.dock-link:focus-visible .dock-indicator {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* ---------- Motion ---------- */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dock-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dock-bounce {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    transform: translateY(-10px) scale(1.03);
+  }
+  68% {
+    transform: translateY(0) scale(0.98);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 600px) {
+  :root {
+    --dock-base: 46px;
+    --dock-gap: 9px;
+    --dock-pad-y: 9px;
+  }
+
+  .dock {
+    padding: 0 11px;
+  }
+
+  .dock-shelf {
+    border-radius: 20px;
+  }
+
+  .dock-tooltip {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  :root {
+    --dock-base: 42px;
+    --dock-gap: 7px;
+    --dock-pad-y: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-name,
+  .hero-role,
+  .dock-region,
+  .dock-item.is-bouncing .dock-icon {
+    animation: none;
+  }
+
+  .dock-icon,
+  .dock-icon svg,
+  .dock-tooltip,
+  .dock-indicator {
+    transition: none;
+  }
+}

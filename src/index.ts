@@ -1,422 +1,51 @@
-/**
- * Link shortener.
- *
- * Static assets in ./public are served first. Any request that doesn't match a
- * file lands here: the path (minus slashes) is looked up in the LINKS KV
- * namespace and, if found, redirected to the stored URL.
- *
- * Add links manually in KV:  key = slug (e.g. "gh"), value = full URL.
- *
- * / lists every short link in the namespace; the portfolio lives at /l
- * (public/l.html).
- */
-
-interface KVNamespace {
-  get(key: string): Promise<string | null>;
-  list(options?: { cursor?: string }): Promise<{
-    keys: { name: string }[];
-    list_complete: boolean;
-    cursor?: string;
-  }>;
-}
+import { listLinks, resolveLink, type KVNamespace } from "./links";
+import { renderLandingPage, renderNotFoundPage } from "./page";
 
 interface Env {
   LINKS: KVNamespace;
 }
 
+function decodeSlug(pathname: string): string {
+  const trimmed = pathname.replace(/^\/+|\/+$/g, "");
+  try {
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method !== "GET" && request.method !== "HEAD") {
-      return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
+      return new Response("Method Not Allowed", {
+        status: 405,
+        headers: { Allow: "GET, HEAD" },
+      });
     }
 
     const { pathname } = new URL(request.url);
-    const slug = safeDecode(pathname.replace(/^\/+|\/+$/g, ""));
+    const slug = decodeSlug(pathname);
 
     if (!slug) {
-      return linksPage(env);
+      const links = await listLinks(env.LINKS);
+      return new Response(renderLandingPage(links), {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "public, max-age=300",
+        },
+      });
     }
 
-    const target = await env.LINKS.get(slug);
-    if (target && isHttpUrl(target.trim())) {
-      return Response.redirect(target.trim(), 302);
+    const destination = await resolveLink(env.LINKS, slug);
+    if (destination) {
+      return Response.redirect(destination, 302);
     }
 
-    return notFound();
+    return new Response(renderNotFoundPage(), {
+      status: 404,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
   },
 };
-
-async function linksPage(env: Env): Promise<Response> {
-  // One list() call per 1000 keys; values aren't needed since each link points back to /<slug>.
-  const names: string[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await env.LINKS.list({ cursor });
-    names.push(...page.keys.map((k) => k.name));
-    cursor = page.list_complete ? undefined : page.cursor;
-  } while (cursor);
-
-  const items = names
-    .map(
-      (name) =>
-        `<li><a href="/${escapeHtml(encodeURIComponent(name))}">${Object.hasOwn(ICONS, name) ? ICONS[name] : FALLBACK_ICON}<span>${escapeHtml(name)}</span></a></li>`,
-    )
-    .join("\n      ");
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Links — Douglas Lovera</title>
-  <meta name="theme-color" content="#08080a" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,700..900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
-  <style>
-    :root { color-scheme: dark; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      min-height: 100vh;
-      min-height: 100svh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 40px 16px;
-      background: #08080a;
-      color: #f2f2ee;
-      -webkit-font-smoothing: antialiased;
-    }
-    /* Title and list sit side by side, vertically centered on each other,
-       so the links spread above and below the title's midline. */
-    main {
-      display: flex;
-      align-items: center;
-      gap: 28px;
-    }
-    h1 {
-      font-family: "Archivo", system-ui, sans-serif;
-      font-weight: 800;
-      font-size: 70px;
-      line-height: 1;
-      letter-spacing: -0.03em;
-    }
-    ul {
-      list-style: none;
-      display: grid;
-      gap: 10px;
-      font: 500 14px/1.4 "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-    }
-    a {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: max-content;
-      color: inherit;
-      text-decoration: none;
-    }
-    a:hover span, a:focus-visible span {
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-    span { white-space: nowrap; }
-    @media (max-width: 600px) {
-      /* Stack the links under the title: the link text starts beneath the
-         trailing slash and the icon hangs just left of it. main is sized by
-         the title alone (the list has contain: inline-size). */
-      main { display: block; }
-      h1 { font-size: 56px; }
-      ul {
-        contain: inline-size;
-        margin-top: 24px;
-        padding-left: calc(100% - 46px);
-      }
-    }
-    svg { width: 16px; height: 16px; flex: none; color: #94949c; }
-    .landscape {
-      /* Absolute, not fixed: iOS Safari clips fixed elements above its
-         floating toolbar, but draws in-flow page content underneath it.
-         Large viewport height so it reaches the bottom edge of the screen. */
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: -1;
-      width: 100%;
-      height: 100vh;
-      height: 100lvh;
-      pointer-events: none;
-      image-rendering: pixelated;
-    }
-    .sky {
-      /* Clips the plane while it is off screen, so it never adds a scrollbar. */
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 0;
-      width: 100%;
-      height: 20vh;
-      overflow: hidden;
-      pointer-events: none;
-    }
-    .plane {
-      position: absolute;
-      top: calc(6vh - 12px);
-      left: 0;
-      /* Padding gives a bigger tap target than the plane itself. */
-      padding: 12px;
-      cursor: pointer;
-      pointer-events: auto;
-      -webkit-tap-highlight-color: transparent;
-      animation: fly 40s linear infinite;
-    }
-    .plane.rainbow svg {
-      animation: bob 4s ease-in-out infinite, hue 2s linear infinite;
-    }
-    .plane.rainbow path { fill: url(#plane-rainbow); }
-    .plane svg {
-      display: block;
-      width: 48px;
-      height: 18px;
-      color: #5c5c64;
-      shape-rendering: crispEdges;
-      animation: bob 4s ease-in-out infinite;
-    }
-    /* Cross left to right, wait off screen and turn around, cross back, wait. */
-    @keyframes fly {
-      0% { transform: translateX(-80px) scaleX(1); }
-      42% { transform: translateX(100vw) scaleX(1); }
-      50% { transform: translateX(100vw) scaleX(-1); }
-      92% { transform: translateX(-80px) scaleX(-1); }
-      100% { transform: translateX(-80px) scaleX(1); }
-    }
-    @keyframes hue {
-      to { filter: hue-rotate(360deg); }
-    }
-    @keyframes bob {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(3px); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .sky { display: none; }
-    }
-  </style>
-</head>
-<body>
-  <canvas class="landscape" aria-hidden="true"></canvas>
-  <div class="sky" aria-hidden="true"><div class="plane">${PLANE_SVG}</div></div>
-  <main>
-    <h1>doulo.dev/</h1>
-    <ul>
-      ${items}
-    </ul>
-  </main>
-  <script>${LANDSCAPE_SCRIPT}</script>
-  <script>document.querySelector(".plane")?.addEventListener("click", (e) => e.currentTarget.classList.toggle("rainbow"));</script>
-</body>
-</html>`;
-
-  return new Response(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" },
-  });
-}
-
-// Static, ordered-dither (Bayer 8x8) landscape for the links page backdrop: a hazy sky
-// over layered ridges that darken as they come forward.
-const LANDSCAPE_SCRIPT = `(() => {
-  const canvas = document.querySelector(".landscape");
-  if (!canvas) return;
-  const CELL = 3;
-  const PALETTE = [[8, 8, 10], [22, 22, 26], [38, 38, 44], [60, 60, 68], [92, 92, 100]];
-  const COLORS = PALETTE.map(([r, g, b]) => ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0);
-  const LEVELS = COLORS.length - 1;
-
-  let bayer = [0];
-  for (let n = 1; n < 8; n *= 2) {
-    const next = new Array(n * n * 4);
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-      const v = bayer[y * n + x] * 4;
-      next[y * 2 * n + x] = v;
-      next[y * 2 * n + x + n] = v + 2;
-      next[(y + n) * 2 * n + x] = v + 3;
-      next[(y + n) * 2 * n + x + n] = v + 1;
-    }
-    bayer = next;
-  }
-  bayer = bayer.map((v) => (v + 0.5) / 64);
-
-  // Deterministic 1D fractal value noise, so the skyline is the same on every visit.
-  const lattice = [];
-  let seed = 11;
-  for (let i = 0; i < 512; i++) {
-    seed = (seed * 16807) % 2147483647;
-    lattice.push(seed / 2147483647);
-  }
-  const noise = (t) => {
-    const i = Math.floor(t);
-    const f = t - i;
-    const s = f * f * (3 - 2 * f);
-    const a = lattice[((i % 512) + 512) % 512];
-    const b = lattice[(((i + 1) % 512) + 512) % 512];
-    return a + (b - a) * s;
-  };
-  const fbm = (t) => {
-    let sum = 0, amp = 0.5, freq = 1;
-    for (let o = 0; o < 5; o++) {
-      // Folded noise gives sharper, ridge-like peaks.
-      sum += (1 - Math.abs(noise(t * freq) * 2 - 1)) * amp;
-      amp *= 0.5;
-      freq *= 2.1;
-    }
-    return sum;
-  };
-
-  // Far to near: horizon line, peak height, horizontal scale, tone, offset.
-  const RIDGES = [
-    { base: 0.6, height: 0.24, scale: 2.4, tone: 0.34, offset: 0 },
-    { base: 0.7, height: 0.2, scale: 3.2, tone: 0.24, offset: 40 },
-    { base: 0.82, height: 0.16, scale: 4.2, tone: 0.15, offset: 90 },
-    { base: 0.94, height: 0.12, scale: 5.5, tone: 0.06, offset: 150 },
-  ];
-
-  const draw = () => {
-    const cssWidth = canvas.clientWidth || innerWidth;
-    const cssHeight = canvas.clientHeight || innerHeight;
-    const width = Math.max(1, Math.ceil(cssWidth / CELL));
-    const height = Math.max(1, Math.ceil(cssHeight / CELL));
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    const image = ctx.createImageData(width, height);
-    const pixels = new Uint32Array(image.data.buffer);
-    const aspect = width / height;
-
-    // Squeeze the ridges into the band below the title and links, so no peak
-    // rises over the text. PEAK is the highest point of the far ridge.
-    const PEAK = 0.36;
-    const main = document.querySelector("main");
-    const floor = main ? (main.getBoundingClientRect().bottom - canvas.getBoundingClientRect().top + 32) / cssHeight : PEAK;
-    const top = Math.min(0.85, Math.max(PEAK, floor));
-    const fit = (line) => top + ((line - PEAK) * (1 - top)) / (1 - PEAK);
-
-    const lines = RIDGES.map((r) => {
-      const line = new Float32Array(width);
-      for (let x = 0; x < width; x++) {
-        const u = (x / width) * Math.min(aspect, 2.2);
-        line[x] = fit(r.base - fbm(u * r.scale + r.offset) * r.height);
-      }
-      return line;
-    });
-
-    for (let y = 0; y < height; y++) {
-      const v = y / height;
-      for (let x = 0; x < width; x++) {
-        let value = -1;
-        for (let i = RIDGES.length - 1; i >= 0; i--) {
-          const crest = lines[i][x];
-          if (v >= crest) {
-            // A faint rim on the crest, then mist pooling towards the foot, so each
-            // nearer (darker) ridge stands out against the haze behind it.
-            const depth = Math.min(1, (v - crest) / ((0.22 * (1 - top)) / (1 - PEAK)));
-            const rim = Math.max(0, 1 - depth * 12) * 0.08;
-            value = RIDGES[i].tone + depth * depth * 0.2 + rim;
-            break;
-          }
-        }
-        if (value < 0) {
-          // Sky: faint haze over the horizon.
-          const haze = Math.max(0, (v - (top - 0.25)) / 0.4);
-          value = haze * haze * 0.3;
-        }
-        const scaled = Math.min(1, Math.max(0, value)) * LEVELS;
-        const level = Math.floor(scaled);
-        const step = scaled - level > bayer[(y % 8) * 8 + (x % 8)] ? 1 : 0;
-        pixels[y * width + x] = COLORS[Math.min(LEVELS, level + step)];
-      }
-    }
-    ctx.putImageData(image, 0, 0);
-  };
-
-  draw();
-  document.fonts?.ready.then(draw);
-  let timer;
-  addEventListener("resize", () => {
-    clearTimeout(timer);
-    timer = setTimeout(draw, 120);
-  });
-})();`;
-
-// A small side-view plane (click or tap it to toggle a cycling rainbow), facing right, drawn on the same 3px grid as the backdrop.
-const PLANE_ROWS = [
-  "#...............",
-  "##..............",
-  "###############.",
-  ".###############",
-  "......####......",
-  ".......##.......",
-];
-const PLANE_SVG = `<svg viewBox="0 0 16 6"><defs><linearGradient id="plane-rainbow"><stop offset="0" stop-color="#ff5c5c"/><stop offset=".2" stop-color="#ffb347"/><stop offset=".4" stop-color="#ffe66d"/><stop offset=".6" stop-color="#6ee7a0"/><stop offset=".8" stop-color="#6ea8fe"/><stop offset="1" stop-color="#c38bff"/></linearGradient></defs><path fill="currentColor" d="${PLANE_ROWS.flatMap((row, y) =>
-  [...row].map((c, x) => (c === "#" ? `M${x} ${y}h1v1h-1z` : "")),
-).join("")}"/></svg>`;
-
-// Icons keyed by slug (GitHub, LinkedIn, Substack marks from public/l.html; Instagram, X from Simple Icons).
-const ICONS: Record<string, string> = {
-  gh: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z"/></svg>`,
-  in: `<svg viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="M218.123 218.127h-37.931v-59.403c0-14.165-.253-32.4-19.728-32.4-19.756 0-22.779 15.434-22.779 31.369v60.43h-37.93V95.967h36.413v16.694h.51a39.907 39.907 0 0 1 35.928-19.733c38.445 0 45.533 25.288 45.533 58.186l-.016 67.013ZM56.955 79.27c-12.157.002-22.014-9.852-22.016-22.009-.002-12.157 9.851-22.014 22.008-22.016 12.157-.003 22.014 9.851 22.016 22.008A22.013 22.013 0 0 1 56.955 79.27m18.966 138.858H37.95V95.967h37.97v122.16ZM237.033.018H18.89C8.58-.098.125 8.161-.001 18.471v219.053c.122 10.315 8.576 18.582 18.89 18.474h218.144c10.336.128 18.823-8.139 18.966-18.474V18.454c-.147-10.33-8.635-18.588-18.966-18.453"/></svg>`,
-  ig: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></svg>`,
-  x: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg>`,
-  substack: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M22.539 8.242H1.46V5.406h21.08v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.08V0z"/></svg>`,
-};
-ICONS.twitter = ICONS.x;
-
-const FALLBACK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-}
-
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const { protocol } = new URL(value);
-    return protocol === "http:" || protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function notFound(): Response {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Not found — Douglas Lovera</title>
-  <meta name="theme-color" content="#08080a" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,700..900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css" />
-  <script src="/app.js" defer></script>
-</head>
-<body>
-  <canvas class="backdrop" aria-hidden="true"></canvas>
-  <main class="page">
-    <header class="hero">
-      <h1 class="hero__title"><span>404</span></h1>
-      <p class="hero__subtitle"><a href="/" style="color: inherit;">Back to doulo.dev</a></p>
-    </header>
-  </main>
-</body>
-</html>`;
-  return new Response(html, {
-    status: 404,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
-}
